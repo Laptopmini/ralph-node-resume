@@ -72,7 +72,7 @@ tailwind.config.*         → styling system
 - `src/` or `app/` or `lib/` — main source layout
 - Any existing feature folders similar to what's being built
 - README.md or CLAUDE.md — architecture patterns and conventions
-- Look for a test directory to understand testing conventions
+- Look for a test directory to understand testing conventions and identify existing test files that may conflict with the planned changes
 - Look for `playwright.config.*` and `jest.config.*` — test framework setup
 - Look for an existing router/navigation file if this feature involves new pages/routes
 
@@ -81,6 +81,7 @@ tailwind.config.*         → styling system
 - Styling system (Tailwind, CSS Modules, styled-components, etc.)
 - Testing framework (Jest for unit tests, Playwright for E2E, or others)
 - Key conventions (file naming, folder structure, import paths)
+- Which existing test files would be invalidated by the planned changes (e.g. an E2E test for a page being removed)
 
 ### Step 3 — Identify gaps and assumptions
 
@@ -109,9 +110,21 @@ A workstream becomes a **ticket**. If the feature is simple enough that all work
 Before writing the plan, verify that no ticket proposes modifying protected files:
 - `.github/scripts/*` or `.github/prompts/*` — ralph loop infrastructure
 - `.claude/settings.json`, `.aignore`, `biome.json` — project configuration
-- Test assertions or mock logic — to prevent forcing passes
 
 If the feature requires changes to any of these, flag it as an assumption and explain why.
+
+### Step 5b — Identify conflicting test files
+
+Review existing test files (unit tests, E2E specs, etc.) and determine which ones would be **invalidated** by the planned implementation changes. For example:
+- An E2E test for a page that is being removed or replaced
+- A unit test for a module that is being deleted or fundamentally restructured
+- A test file whose assertions would no longer make sense after the implementation
+
+Each conflicting test file must be:
+1. Listed in the appropriate ticket's "Files owned" section with a `(delete)` tag
+2. Represented as a dedicated task describing **which file to delete** and **how to validate the removal** (e.g. "Delete `tests/e2e/old-page.spec.ts` — verify by confirming the file no longer exists on disk and that no other source files import or reference it")
+
+This ensures the implementation does not leave behind broken or misleading tests.
 
 ### Step 6 — Write the plan
 
@@ -153,6 +166,9 @@ Follow the output format below exactly.
 - `prisma/schema.prisma`
 - `src/components/Nav.tsx`
 
+**Conflicting test files to remove:**
+- `tests/e2e/old-page.spec.ts` — tests a page being replaced by this feature
+
 ---
 
 ### 3. Tickets
@@ -176,10 +192,10 @@ on in parallel. No ticket depends on another, and no two tickets touch the same 
 - `app/api/reading-list/[id]/route.ts` (create)
 
 **Tasks:**
-1. [logic] Add `ReadingListItem` model to `schema.prisma` and run migration
-2. [logic] Implement `POST /api/reading-list` to save an article for the authed user
-3. [logic] Implement `DELETE /api/reading-list/[id]`
-4. [logic] Implement `PATCH /api/reading-list/[id]` to toggle read/unread
+1. [logic] Add `ReadingListItem` model to `schema.prisma` with fields: `id` (cuid), `userId` (relation to User), `articleUrl` (string), `title` (string), `isRead` (boolean, default false), `createdAt` (datetime). Run migration
+2. [logic] Implement `POST /api/reading-list` — accepts `{ articleUrl, title }`, creates a `ReadingListItem` for the authenticated user, returns 201 with the created item. Returns 401 if unauthenticated
+3. [logic] Implement `DELETE /api/reading-list/[id]` — deletes the item if it belongs to the authenticated user, returns 204. Returns 404 if not found, 403 if owned by another user
+4. [logic] Implement `PATCH /api/reading-list/[id]` — toggles `isRead` between true/false for the authenticated user's item, returns 200 with the updated item
 
 ---
 
@@ -188,7 +204,7 @@ on in parallel. No ticket depends on another, and no two tickets touch the same 
 > [One sentence describing the scope of this workstream]
 
 **Constraints:**
-- [e.g. "Use `data-testid` attributes for all interactive elements"]
+- Use `data-testid` attributes on all interactive and display elements (buttons, inputs, lists, status indicators)
 
 **Files owned:**
 - `src/stores/readingListStore.ts` (create)
@@ -196,17 +212,19 @@ on in parallel. No ticket depends on another, and no two tickets touch the same 
 - `src/components/ReadingList/index.ts` (create)
 - `app/reading-list/page.tsx` (create)
 - `src/components/Nav.tsx` (modify)
+- `tests/e2e/old-page.spec.ts` (delete)
 
 **Tasks:**
-1. [logic] Create `readingListStore.ts` with Zustand; mock API calls initially
-2. [ui] Build `ReadingList` component with read/unread filter UI
-3. [ui] Add `/reading-list` page and wire `ReadingList` component in
-4. [ui] Add nav link in `Nav.tsx`
-5. [logic] Replace mocked API calls in store with real endpoints
+1. [infra] Delete `tests/e2e/old-page.spec.ts` — this E2E test targets a page being replaced by the reading list feature. Verify the file no longer exists on disk and that no other source files import or reference it
+2. [logic] Create `readingListStore.ts` with Zustand — expose `items` (array of `ReadingListItem`), `fetchItems()`, `addItem(articleUrl, title)`, `removeItem(id)`, `toggleRead(id)`. Mock API calls initially, returning predictable test-friendly data
+2. [ui] Build `ReadingList` component — renders a list of items (`data-testid="reading-list"`), each item shows title, URL, read/unread status (`data-testid="item-{id}"`), a delete button (`data-testid="delete-{id}"`), and a toggle-read button (`data-testid="toggle-read-{id}"`). Include a filter bar (`data-testid="filter-bar"`) with "All", "Unread", "Read" options
+3. [ui] Add `/reading-list` page (`data-testid="reading-list-page"`) — mounts `ReadingList` component, shows loading state (`data-testid="loading-indicator"`) while fetching, and empty state (`data-testid="empty-state"`) when no items exist
+4. [ui] Add nav link (`data-testid="nav-reading-list"`) in `Nav.tsx` pointing to `/reading-list`
+5. [logic] Replace mocked API calls in store with real `fetch()` calls to `/api/reading-list` endpoints
 
 ---
 
-> **Note:** Tickets can be worked in parallel. Tasks within each ticket are sequential.
+> **Note:** Tickets can be worked in parallel. Tasks within each ticket are sequential. No ticket includes test creation — testing is handled separately.
 ```
 
 ---
@@ -223,8 +241,12 @@ Before outputting the plan, verify:
 - [ ] It is valid to produce only one ticket if the work cannot be cleanly parallelized
 - [ ] No ticket proposes modifying protected files (`.github/scripts/*`, `.github/prompts/*`, `.claude/settings.json`, `.aignore`, `biome.json`)
 - [ ] Every task has a nature tag: `[logic]`, `[ui]`, or `[infra]`
-- [ ] Every file in "Files owned" has an operation tag: `(create)` or `(modify)`
+- [ ] Every file in "Files owned" has an operation tag: `(create)`, `(modify)`, or `(delete)`
 - [ ] Every ticket has a Constraints section (can be empty if none apply)
+- [ ] **No task creates, writes, or modifies test files** — test creation is handled by a separate effort. Deleting or modifying conflicting test files is allowed and expected
+- [ ] Every task description is specific enough that a developer could derive unit, E2E, or utility tests from it (includes inputs, outputs, edge cases, expected behaviors, status codes, `data-testid` values, etc.)
+- [ ] All UI tasks enforce `data-testid` attributes on interactive and display elements
+- [ ] Existing test files that conflict with the planned changes are listed for deletion in the appropriate ticket
 
 ---
 
@@ -240,3 +262,8 @@ Before outputting the plan, verify:
 - `[infra]` — configuration, environment setup, dependency installation, CI/CD
 
 Avoid vague tasks like "implement X" — each task should describe exactly what to build or change. These tasks will be consumed by downstream tooling, so they should be as specific as possible.
+
+**Testing policy:**
+- **Do not create test files or test-writing tasks.** Testing is performed by a separate developer as part of a dedicated effort. No ticket should include tasks to create, write, or modify test files (`.test.ts`, `.spec.ts`, etc.). Deleting or modifying conflicting test files is distinct from this rule and is expected.
+- **Do remove conflicting test files.** If the implementation removes or replaces functionality that has existing test coverage, include the deletion of those test files as a task in the relevant ticket.
+- **Do write testable code.** Tasks must still follow test-friendly practices: use `data-testid` attributes on all interactive and display elements, keep pure logic in separate importable modules, and describe behavior with enough specificity (inputs, outputs, edge cases, status codes, error states) that a developer could derive comprehensive tests from the task description alone.
