@@ -89,7 +89,13 @@ git push -u origin prd-<ticket-number>-requirements
 
 #### 2e — Open a pull request
 
-Use `gh pr create` to open a PR:
+First, determine the GitHub `owner/repo` slug for use with `gh`:
+
+```bash
+REPO_SLUG=$(bash .claude/skills/ticketmaster/scripts/repo-slug.sh)
+```
+
+Then use `gh pr create` to open a PR, passing `--repo "$REPO_SLUG"`:
 
 - **Base branch**: `prd-<ticket-number>`
 - **Head branch**: `prd-<ticket-number>-requirements`
