@@ -47,7 +47,8 @@
 
 ### 3. Tickets
 
-Each ticket is an independent workstream. No two tickets touch the same file.
+Tickets are workstreams. No two tickets touch the same file. A ticket is workable once
+all tickets in its `depends_on` list are complete. Siblings under the same parent run in parallel.
 
 ---
 
@@ -76,13 +77,15 @@ Each ticket is an independent workstream. No two tickets touch the same file.
 ---
 
 #### Ticket 2: UI & Styling
+**depends_on:** [Ticket 1]
 
-> Replace the Hello World homepage with the Pomodoro timer interface and wire it to the timer logic.
+> Replace the Hello World homepage with the Pomodoro timer interface, wiring the DOM to the PomodoroTimer class from Ticket 1.
 
 **Constraints:**
 - Use `data-testid` attributes on all interactive and display elements
 - The page must remain a single static HTML file served by `serve`
 - Follow existing Biome formatting rules (double quotes, trailing commas, semicolons, 2-space indent)
+- Imports from Ticket 1 files are read-only — do not modify files owned by Ticket 1
 
 **Files owned:**
 - `src/index.html` (modify)
@@ -109,14 +112,11 @@ Each ticket is an independent workstream. No two tickets touch the same file.
    - Responsive: readable on mobile viewports (min-width 320px)
 4. [logic] Create `src/app.js` — browser script that:
    - On `DOMContentLoaded`, selects elements by `data-testid` attributes
-   - Implements the timer countdown inline (since the `timer.ts` module is for unit-testable logic, `app.js` is the browser-compatible wiring):
-     - Maintains state: `remainingSeconds` (initially `1500`), `intervalId` (initially `null`)
-     - Formats time as `MM:SS` using `Math.floor(remaining / 60)` and `remaining % 60`, zero-padded
-     - **Start button click**: if not running, starts a `setInterval` (1 second) that decrements `remainingSeconds`, updates the display, and auto-stops at `0`
-     - **Pause button click**: clears the interval (if running), preserving `remainingSeconds`
-     - **Reset button click**: clears the interval, sets `remainingSeconds` back to `1500`, updates display to `25:00`
-   - Updates `[data-testid="timer-display"]` text content on every tick
+   - Instantiates `PomodoroTimer` from `src/timer.ts` (Ticket 1) with an `onTick` callback that formats remaining seconds as `MM:SS` using `Math.floor(remaining / 60)` and `remaining % 60`, zero-padded, and updates `[data-testid="timer-display"]` text content
+   - **Start button click**: calls `timer.start()`
+   - **Pause button click**: calls `timer.pause()`
+   - **Reset button click**: calls `timer.reset()`
 
 ---
 
-> **Note:** Tickets can be worked in parallel. Tasks within each ticket are sequential. No ticket includes test creation — testing is handled separately.
+> **Note:** A ticket is workable once all tickets in its `depends_on` list are complete — siblings under the same parent run in parallel. Tasks within each ticket are sequential. No ticket includes test creation — testing is handled separately.

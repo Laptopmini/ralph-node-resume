@@ -92,16 +92,24 @@ Before writing the plan, flag:
 
 State these as **Assumptions** at the top of the plan. Keep it brief — just enough for a developer to validate.
 
-### Step 4 — Identify parallel workstreams (tickets)
+### Step 4 — Identify workstreams and dependencies (tickets)
 
-Before writing the plan, think carefully about which areas of work are **truly independent** — meaning a developer working on one would never need to wait for, modify the same files as, or coordinate with a developer on another.
+Before writing the plan, think carefully about how areas of work relate to each other. Some work is truly independent (can be done in parallel), while other work builds on a foundation that must exist first.
 
-Common natural splits:
+**Identify natural splits:**
+- **Shared infrastructure** — layouts, shared components, utility modules, configuration that multiple features consume
 - **Backend/API work** — schema, migrations, route handlers, business logic
-- **Frontend/UI work** — components, pages, stores — if they can be built against a mocked API
+- **Frontend/UI work** — components, pages, stores
 - **Infrastructure/config** — environment variables, feature flags, third-party service setup
 
 A workstream becomes a **ticket**. If the feature is simple enough that all work is interdependent, one ticket is correct — do not force a split.
+
+**Dependency rules:**
+- A ticket may declare `depends_on: [Ticket N]` to indicate it requires another ticket's outputs (files, exports, routes) to exist first
+- A child ticket may **import from** files created by its parent ticket, but must never **modify** them
+- **Scheduling:** A ticket is workable once all tickets in its `depends_on` list are complete. Any two tickets whose dependencies are both satisfied can run in parallel (this includes siblings under the same parent)
+- Prefer shallow trees (depth ≤ 2). If you find yourself nesting 3+ levels deep, re-evaluate the split — the granularity is likely too fine
+- Do not duplicate logic to avoid a dependency. If a ticket would reimplement something another ticket already creates, add a `depends_on` instead
 
 **Key rule:** Two tickets must never touch the same file. If they would, merge them into one ticket.
 
@@ -133,8 +141,6 @@ Follow the output format below exactly.
 ---
 
 ## Output Format
-
-The output must follow this structure. Refer to `.claude/skills/blueprint/examples/sample.md` for a concrete example.
 
 ```markdown
 ## Implementation Plan: [Feature Name]
@@ -175,8 +181,8 @@ The output must follow this structure. Refer to `.claude/skills/blueprint/exampl
 
 ### 3. Tickets
 
-Each ticket is an independent workstream that can be assigned to a separate developer and worked
-on in parallel. No ticket depends on another, and no two tickets touch the same file.
+Tickets are workstreams. No two tickets touch the same file. A ticket is workable once
+all tickets in its `depends_on` list are complete. Siblings under the same parent run in parallel.
 
 ---
 
@@ -202,11 +208,13 @@ on in parallel. No ticket depends on another, and no two tickets touch the same 
 ---
 
 #### Ticket 2: [Short name, e.g. "UI Components & State"]
+**depends_on:** [Ticket 1]
 
 > [One sentence describing the scope of this workstream]
 
 **Constraints:**
 - Use `data-testid` attributes on all interactive and display elements (buttons, inputs, lists, status indicators)
+- Imports from Ticket 1 files are read-only — do not modify files owned by Ticket 1
 
 **Files owned:**
 - `src/stores/readingListStore.ts` (create)
@@ -218,15 +226,14 @@ on in parallel. No ticket depends on another, and no two tickets touch the same 
 
 **Tasks:**
 1. [infra] Delete `tests/e2e/old-page.spec.ts` — this E2E test targets a page being replaced by the reading list feature. Verify the file no longer exists on disk and that no other source files import or reference it
-2. [logic] Create `readingListStore.ts` with Zustand — expose `items` (array of `ReadingListItem`), `fetchItems()`, `addItem(articleUrl, title)`, `removeItem(id)`, `toggleRead(id)`. Mock API calls initially, returning predictable test-friendly data
-2. [ui] Build `ReadingList` component — renders a list of items (`data-testid="reading-list"`), each item shows title, URL, read/unread status (`data-testid="item-{id}"`), a delete button (`data-testid="delete-{id}"`), and a toggle-read button (`data-testid="toggle-read-{id}"`). Include a filter bar (`data-testid="filter-bar"`) with "All", "Unread", "Read" options
-3. [ui] Add `/reading-list` page (`data-testid="reading-list-page"`) — mounts `ReadingList` component, shows loading state (`data-testid="loading-indicator"`) while fetching, and empty state (`data-testid="empty-state"`) when no items exist
-4. [ui] Add nav link (`data-testid="nav-reading-list"`) in `Nav.tsx` pointing to `/reading-list`
-5. [logic] Replace mocked API calls in store with real `fetch()` calls to `/api/reading-list` endpoints
+2. [logic] Create `readingListStore.ts` with Zustand — expose `items` (array of `ReadingListItem`), `fetchItems()`, `addItem(articleUrl, title)`, `removeItem(id)`, `toggleRead(id)`. Use real `fetch()` calls to `/api/reading-list` endpoints from Ticket 1
+3. [ui] Build `ReadingList` component — renders a list of items (`data-testid="reading-list"`), each item shows title, URL, read/unread status (`data-testid="item-{id}"`), a delete button (`data-testid="delete-{id}"`), and a toggle-read button (`data-testid="toggle-read-{id}"`). Include a filter bar (`data-testid="filter-bar"`) with "All", "Unread", "Read" options
+4. [ui] Add `/reading-list` page (`data-testid="reading-list-page"`) — mounts `ReadingList` component, shows loading state (`data-testid="loading-indicator"`) while fetching, and empty state (`data-testid="empty-state"`) when no items exist
+5. [ui] Add nav link (`data-testid="nav-reading-list"`) in `Nav.tsx` pointing to `/reading-list`
 
 ---
 
-> **Note:** Tickets can be worked in parallel. Tasks within each ticket are sequential. No ticket includes test creation — testing is handled separately.
+> **Note:** A ticket is workable once all tickets in its `depends_on` list are complete — siblings under the same parent run in parallel. Tasks within each ticket are sequential. No ticket includes test creation — testing is handled separately.
 ```
 
 ---
@@ -237,7 +244,11 @@ Before outputting the plan, verify:
 - [ ] No two tickets own the same file — if they do, merge those tickets
 - [ ] Every file in the File & Code Structure section is owned by exactly one ticket
 - [ ] Tasks within each ticket are truly atomic and sequential (each one builds on the last)
-- [ ] No ticket's tasks implicitly require output from another ticket to proceed
+- [ ] If a ticket's tasks require output from another ticket, `depends_on` is declared explicitly
+- [ ] No ticket implicitly requires another ticket's output without declaring `depends_on`
+- [ ] Child tickets never modify files owned by their parent — they may only import/read from them
+- [ ] Dependency depth is ≤ 2 levels (parent → child, not parent → child → grandchild)
+- [ ] No logic is duplicated to avoid a dependency — use `depends_on` instead
 - [ ] The tech stack section reflects what was actually found in the repo, not guessed
 - [ ] Assumptions cover any ambiguity that would block a developer from starting
 - [ ] It is valid to produce only one ticket if the work cannot be cleanly parallelized
@@ -254,7 +265,7 @@ Before outputting the plan, verify:
 
 ## Notes on Ticket & Task Granularity
 
-**Tickets** represent parallel workstreams — assign one per developer or team. A ticket owns a set of files exclusively. If all the work in a feature naturally touches the same files, one ticket is the right answer.
+**Tickets** represent workstreams — assign one per developer or team. A ticket owns a set of files exclusively. A ticket is workable once all tickets in its `depends_on` list are complete — siblings under the same parent can run in parallel. A child ticket may import from (but never modify) parent-owned files. If all the work in a feature naturally touches the same files, one ticket is the right answer.
 
 **Tasks** within a ticket are atomic units of work done one at a time in sequence. Each task should be a single, focused unit of work that a headless AI agent can implement in one cycle. If a task requires touching more than 2-3 files or involves multiple unrelated concerns, split it. If two adjacent tasks always touch only the same file, consider merging them.
 
