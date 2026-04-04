@@ -134,6 +134,8 @@ Follow the output format below exactly.
 
 ## Output Format
 
+The output must follow this structure. Refer to `.claude/skills/blueprint/examples/sample.md` for a concrete example.
+
 ```markdown
 ## Implementation Plan: [Feature Name]
 

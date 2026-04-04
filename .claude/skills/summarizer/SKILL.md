@@ -71,6 +71,8 @@ Given the diff output, perform the following analysis:
 
 #### PR Description Format
 
+The generated PR Description must follow this structure. Refer to `.claude/skills/summarizer/examples/sample.md` for a concrete example.
+
 ```markdown
 ## Summary
 
