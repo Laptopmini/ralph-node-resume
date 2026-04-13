@@ -9,6 +9,9 @@ set -euo pipefail
 
 source .github/scripts/log.sh
 source .github/scripts/prompt.sh
+source .github/scripts/summarizer.sh
+
+# FIXME: Double sourcing, bad practice
 
 # Settings
 
@@ -19,11 +22,18 @@ BLUEPRINT_FILE=".maestro.blueprint.md"
 BLUEPRINT_LEVELS_FILE=".maestro.blueprint.levels"
 SLICE_FILE=".maestro.level.md"
 PR_TSV_FILE=".maestro.pull-requests.tsv"
+
+# Models
+
+# STAFF_DEVELOPER_MODEL="google/gemma-4-26b-a4b" # Planning
+# SENIOR_DEVELOPER_MODEL="google/gemma-4-31b" # Backpressure
+# JUNIOR_DEVELOPER_MODEL="qwen/qwen3.5-35b-a3b" # Implementation & PR Descriptions
+
+# Variables
+
 REPO_SLUG=$(bash .github/scripts/repo-slug.sh)
 
 # Functions
-
-summarizer() { prompt "/summarizer $*" --allowedTools "Read,Write,Bash" --model qwen/qwen3.5-35b-a3b; }
 
 ask_continue() { read -n 1 -s -r -p "$*"$'\n' < /dev/tty; }
 
@@ -141,6 +151,7 @@ while $MISSING_BLUEPRINT; do
         REUSING_EXISTING_PLAN=true
     else
         log INFO "Generating implementation plan..."
+        # FIXME: Change this into a pure prompt rather than a skill
         TREE_LEVELS=$(prompt "/blueprint $*" --allowedTools "Read,Glob,Grep,Write" --model opus)
 
         # FIXME: Should tree levels be written by the skill using a script to avoid divergence?
@@ -212,7 +223,7 @@ while IFS= read -r LEVEL; do
     log INFO "Generating PRD(s)..."
     rm -f "$PR_TSV_FILE"
     for TICKET_NUM in $(echo "$LEVEL" | tr ',' '\n' | grep .); do
-        TICKETMASTER_PROMPT=$(bash .github/scripts/get-prompt.sh "$BLUEPRINT_FILE" "$TICKET_NUM")
+        TICKETMASTER_PROMPT=$(bash .github/scripts/ticketmaster/get-prompt.sh "$BLUEPRINT_FILE" "$TICKET_NUM")
         bash .github/scripts/ticketmaster/checkout.sh "$TICKET_NUM"
         prompt "$TICKETMASTER_PROMPT" --allowedTools "Write" --model qwen/qwen3.5-35b-a3b || true
         TICKET_TITLE=$(awk -v n="$TICKET_NUM" '$0 ~ "^#### Ticket " n ":" { sub(/^#### Ticket [0-9]+: */, ""); print; exit }' "$BLUEPRINT_FILE")
@@ -272,7 +283,7 @@ while IFS= read -r LEVEL; do
         git diff --cached --quiet || git commit -m "chore(ai): Backpressure"
         git push -u origin "$BACKPRESSURE_BRANCH_NAME"
 
-        summarizer "$REPO_SLUG" "$BACKPRESSURE_BRANCH_NAME" "$BASE_BRANCH_NAME"
+        summarizer "$BACKPRESSURE_BRANCH_NAME" "$BASE_BRANCH_NAME"
 
         log SUCCESS "Generated backpressure for \"$BASE_BRANCH_NAME\"!"
     done <<< "$BRANCHES"
@@ -306,7 +317,7 @@ while IFS= read -r LEVEL; do
         git diff --cached --quiet || git commit -m "chore(ai): Update Ralph log"
         git push -u origin "$BASE_BRANCH_NAME"
 
-        summarizer "$REPO_SLUG" "$BASE_BRANCH_NAME" maestro
+        summarizer "$BASE_BRANCH_NAME" maestro
 
         log SUCCESS "Finished implementation for \"$BASE_BRANCH_NAME\"!"
     done <<< "$BACKPRESSURE_BRANCHES"
@@ -340,7 +351,7 @@ git commit -m "chore(ai): Add Maestro log"
 git push -u origin maestro
 
 log INFO "Opening final PR..."
-summarizer "$REPO_SLUG" maestro main
+summarizer maestro main
 view_pull_requests
 
 log INFO "Switching back to main..."
