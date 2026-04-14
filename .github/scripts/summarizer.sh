@@ -67,7 +67,7 @@ summarizer() {
 ${DIFF_OUTPUT}"
 
     # --- Step 4: Execute via prompt() ---
-    prompt "$RENDERED" --allowedTools "Write" --model qwen/qwen3.5-35b-a3b
+    prompt "$RENDERED" --allowedTools "Write" --model "${MIDLEVEL_DEVELOPER_MODEL:-haiku}"
 
     # --- Step 5: Extract title and prepare PR body ---
     local BODY_FILE=".maestro.summary.md"

@@ -25,9 +25,12 @@ PR_TSV_FILE=".maestro.pull-requests.tsv"
 
 # Models
 
-# STAFF_DEVELOPER_MODEL="opus" # Planning
-# SENIOR_DEVELOPER_MODEL="google/gemma-4-31b" # Backpressure
-# JUNIOR_DEVELOPER_MODEL="qwen/qwen3.5-35b-a3b" # Implementation & PR Descriptions
+export STAFF_DEVELOPER_MODEL="opus" # Planning & Backpressure
+export SENIOR_DEVELOPER_MODEL="qwen/qwen3.5-35b-a3b" # Ticket Breakdown
+export MIDLEVEL_DEVELOPER_MODEL="qwen/qwen3-coder-30b" # PR Descriptions
+export JUNIOR_DEVELOPER_MODEL="$MIDLEVEL_DEVELOPER_MODEL" # Implementation
+
+# FIXME: Try using google/gemma-4-26b-a4b for PR Descriptions
 
 # Variables
 
@@ -158,7 +161,7 @@ while $MISSING_BLUEPRINT; do
     else
         log INFO "Generating implementation plan..."
         # FIXME: Change this into a pure prompt rather than a skill
-        TREE_LEVELS=$(prompt "/blueprint $*" --allowedTools "Read,Glob,Grep,Write" --model opus)
+        TREE_LEVELS=$(prompt "/blueprint $*" --allowedTools "Read,Glob,Grep,Write" --model "$STAFF_DEVELOPER_MODEL")
 
         # FIXME: Should tree levels be written by the skill using a script to avoid divergence?
 
@@ -231,7 +234,7 @@ while IFS= read -r LEVEL; do
     for TICKET_NUM in $(echo "$LEVEL" | tr ',' '\n' | grep .); do
         TICKETMASTER_PROMPT=$(bash .github/scripts/ticketmaster/get-prompt.sh "$BLUEPRINT_FILE" "$TICKET_NUM")
         bash .github/scripts/ticketmaster/checkout.sh "$TICKET_NUM"
-        prompt "$TICKETMASTER_PROMPT" --allowedTools "Write" --model qwen/qwen3.5-35b-a3b || true
+        prompt "$TICKETMASTER_PROMPT" --allowedTools "Write" --model "$SENIOR_DEVELOPER_MODEL" || true
         TICKET_TITLE=$(awk -v n="$TICKET_NUM" '$0 ~ "^#### Ticket " n ":" { sub(/^#### Ticket [0-9]+: */, ""); print; exit }' "$BLUEPRINT_FILE")
         bash .github/scripts/ticketmaster/push-changes.sh "$TICKET_NUM" "$TICKET_TITLE"
         echo "$TICKETMASTER_PROMPT" > "$FOLDER_NAME/ticketmaster-$TICKET_NUM.md"
@@ -286,7 +289,7 @@ while IFS= read -r LEVEL; do
         git checkout -b "$BACKPRESSURE_BRANCH_NAME"
         npm i && npm run backpressure
         git add .
-        git diff --cached --quiet || git commit -m "chore(ai): Backpressure"
+        git diff --cached --quiet || git commit -m "feat(ai): Backpressure for $BASE_BRANCH_NAME"
         git push -u origin "$BACKPRESSURE_BRANCH_NAME"
 
         summarizer "$BACKPRESSURE_BRANCH_NAME" "$BASE_BRANCH_NAME"
@@ -353,7 +356,7 @@ mv -f "$BLUEPRINT_FILE" "$FOLDER_NAME/plan.md"
 mv -f "$BLUEPRINT_LEVELS_FILE" "$FOLDER_NAME/plan.levels"
 mv -f "$LOG_FILE" "$FOLDER_NAME/maestro.log"
 git add .
-git commit -m "chore(ai): Add Maestro log"
+git commit -m "chore(ai): Add Maestro log for $FOLDER_NAME"
 git push -u origin maestro
 
 log INFO "Opening final PR..."
