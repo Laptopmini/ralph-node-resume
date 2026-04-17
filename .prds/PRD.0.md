@@ -21,6 +21,6 @@ Establish and verify the baseline configuration for TypeScript, Jest (unit testi
 
 - [x] Configure Jest. Create a `jest.config.js` using the `@swc/jest` preset for a standard Node/TypeScript environment. Add a `"test:unit"` script to `package.json` that runs Jest. Create a sanity test at `tests/unit/setup.test.ts` with a single passing assertion (`expect(1 + 1).toBe(2)`). `[test: npx jest]`
 
-- [x] Configure Playwright. Create a `playwright.config.ts` set to run headless Chromium, with `baseURL` set to `http://localhost:3000` as a placeholder. Add a `"test:e2e"` script to `package.json` that runs Playwright. Create a sanity test at `tests/e2e/setup.spec.ts` that navigates to `about:blank` and asserts the page title is an empty string. `[test: npx playwright test]`
+- [x] Configure Playwright. Create a `playwright.config.ts` set to run headless Chromium, with `baseURL` set to `http://localhost:3000` as a placeholder and `timeout` set to `10000`. Add a `"test:e2e"` script to `package.json` that runs Playwright. Create a sanity test at `tests/e2e/setup.spec.ts` that navigates to `about:blank` and asserts the page title is an empty string. Add both `*.spec.ts` and `*.test.ts` as a pattern to discover test files. `[test: npx playwright test]`
 
 - [x] Wire up a root test script. Update the `"test"` script in `package.json` to run `test:unit` and `test:e2e` sequentially. Verify it exits cleanly. `[test: npm test]`
