@@ -24,7 +24,7 @@ PR_SUMMARY_FILE=".maestro.summary.md"
 
 # Models
 
-export STAFF_DEVELOPER_MODEL="opus" # Planning & Backpressure
+export STAFF_DEVELOPER_MODEL="claude-opus-4-6" # Planning & Backpressure
 export SENIOR_DEVELOPER_MODEL="qwen/qwen3.5-35b-a3b" # Ticket Breakdown
 export MIDLEVEL_DEVELOPER_MODEL="google/gemma-4-26b-a4b" # PR Descriptions
 export JUNIOR_DEVELOPER_MODEL="google/gemma-4-26b-a4b" # Implementation
