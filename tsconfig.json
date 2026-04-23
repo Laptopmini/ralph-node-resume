@@ -11,6 +11,6 @@
     "rootDir": ".",
     "types": ["jest", "node"]
   },
-  "include": ["src/**/*", "tests/**/*"],
-  "exclude": [".next", "dist", "node_modules"]
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": [".next", "dist", "node_modules", "tests"]
 }
